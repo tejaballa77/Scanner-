@@ -14,10 +14,17 @@ export default function ScannerScreen() {
   const { sendScan } = useWebSocket();
 
   const triggerVibration = (pattern) => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate(pattern);
-      } catch (e) {}
+        const success = navigator.vibrate(pattern);
+        if (!success) {
+          navigator.vibrate(200);
+        }
+      } catch (e) {
+        try {
+          navigator.vibrate(200);
+        } catch (e2) {}
+      }
     }
   };
 
@@ -33,11 +40,11 @@ export default function ScannerScreen() {
     const res = await sendScan(decodedText);
 
     if (res && res.isDuplicate) {
-      triggerVibration([200, 100, 200]);
+      triggerVibration([250, 100, 250]);
       setAutoSaveNotification({ text: 'Already included', isDuplicate: true });
       setTimeout(() => setAutoSaveNotification(null), 1600);
     } else {
-      triggerVibration([120, 80, 120]);
+      triggerVibration([180, 80, 180]);
       const previewText = decodedText.length > 25 ? decodedText.substring(0, 25) + '...' : decodedText;
       setAutoSaveNotification({ text: `Saved: "${previewText}"`, isDuplicate: false });
       setTimeout(() => setAutoSaveNotification(null), 1600);
