@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, ListFilter } from 'lucide-react';
+import { QrCode, MessageSquare, LayoutDashboard } from 'lucide-react';
 
 export default function BottomNav({ activeTab, setActiveTab }) {
   return (
@@ -9,7 +9,7 @@ export default function BottomNav({ activeTab, setActiveTab }) {
         onClick={() => setActiveTab('scanner')}
       >
         {activeTab === 'scanner' && <div className="nav-indicator" />}
-        <QrCode size={24} />
+        <QrCode size={22} />
         <span>Scanner</span>
       </button>
 
@@ -18,8 +18,17 @@ export default function BottomNav({ activeTab, setActiveTab }) {
         onClick={() => setActiveTab('scans')}
       >
         {activeTab === 'scans' && <div className="nav-indicator" />}
-        <ListFilter size={24} />
+        <MessageSquare size={22} />
         <span>All Scans</span>
+      </button>
+
+      <button 
+        className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
+        onClick={() => setActiveTab('admin')}
+      >
+        {activeTab === 'admin' && <div className="nav-indicator" />}
+        <LayoutDashboard size={22} />
+        <span>Dashboard</span>
       </button>
     </nav>
   );

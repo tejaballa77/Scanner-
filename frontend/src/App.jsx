@@ -9,31 +9,35 @@ import AdminDashboard from './components/AdminDashboard';
 import './App.css';
 
 function MainApp() {
-  const [activeTab, setActiveTab] = useState('scanner'); // 'scanner' or 'scans' or 'admin'
+  const [activeTab, setActiveTab] = useState(() => {
+    // Default to 'admin' dashboard if opened on desktop or if URL contains admin
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+    const isUrlAdmin = typeof window !== 'undefined' && (
+      window.location.search.includes('admin') || 
+      window.location.hash.includes('admin') ||
+      window.location.pathname.includes('admin')
+    );
+    return (isDesktop || isUrlAdmin) ? 'admin' : 'scanner';
+  });
+
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const { userName } = useWebSocket();
 
-  // Check URL parameters for Admin Dashboard route (?admin=true or #admin or /admin)
-  const isAdminRoute = 
-    window.location.search.includes('admin') || 
-    window.location.hash.includes('admin') ||
-    window.location.pathname.includes('admin');
-
-  // Prompt user modal on first load if nickname is empty
+  // Prompt user modal on first load if nickname is empty (only in mobile scanner mode)
   useEffect(() => {
-    if (!userName && !isAdminRoute) {
+    if (!userName && activeTab !== 'admin') {
       setIsUserModalOpen(true);
     }
-  }, [userName, isAdminRoute]);
+  }, [userName, activeTab]);
 
   const toggleFlash = () => {
     setIsFlashOn((prev) => !prev);
   };
 
-  if (isAdminRoute || activeTab === 'admin') {
+  if (activeTab === 'admin') {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-dark)' }}>
+      <div style={{ minHeight: '100vh', width: '100vw', backgroundColor: 'var(--bg-dark)' }}>
         <AdminDashboard />
       </div>
     );
