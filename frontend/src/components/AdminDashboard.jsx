@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Download, Copy, Trash2, Search, RefreshCw, Check, QrCode } from 'lucide-react';
+import { Download, Copy, Search, RefreshCw, Check, QrCode, X, Maximize2 } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function AdminDashboard() {
-  const { scans, clearAllScans, fetchScans, isConnected } = useWebSocket();
+  const { scans, fetchScans } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [selectedQrImage, setSelectedQrImage] = useState(null);
 
   const filteredScans = scans.filter((scan) => {
     const q = searchQuery.toLowerCase();
@@ -44,6 +45,10 @@ export default function AdminDashboard() {
     navigator.clipboard.writeText(allText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getQrImageUrl = (text) => {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -91,29 +96,68 @@ export default function AdminDashboard() {
           <table className="simple-table">
             <thead>
               <tr>
-                <th style={{ width: '60px' }}>#</th>
-                <th style={{ width: '180px' }}>User Name</th>
-                <th style={{ width: '140px' }}>Time</th>
-                <th>Extracted QR Data</th>
+                <th style={{ width: '50px' }}>#</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>QR CODE IMAGE</th>
+                <th style={{ width: '150px' }}>USER NAME</th>
+                <th style={{ width: '130px' }}>TIME</th>
+                <th>EXTRACTED QR DATA</th>
               </tr>
             </thead>
             <tbody>
               {filteredScans.length > 0 ? (
-                filteredScans.map((scan, idx) => (
-                  <tr key={scan.id || idx}>
-                    <td className="td-idx">{scans.length - idx}</td>
-                    <td className="td-user">
-                      <span className="user-badge">{scan.user_name}</span>
-                    </td>
-                    <td className="td-time">
-                      {new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </td>
-                    <td className="td-text">{scan.raw_text}</td>
-                  </tr>
-                ))
+                filteredScans.map((scan, idx) => {
+                  const qrImgUrl = getQrImageUrl(scan.raw_text);
+                  return (
+                    <tr key={scan.id || idx}>
+                      <td className="td-idx">{scans.length - idx}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div 
+                          onClick={() => setSelectedQrImage({ url: qrImgUrl, text: scan.raw_text, user: scan.user_name })}
+                          style={{
+                            display: 'inline-flex',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            background: '#FFFFFF',
+                            borderRadius: '8px',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                            transition: 'transform 0.15s ease'
+                          }}
+                          className="qr-thumb-wrapper"
+                          title="Click to view large QR image"
+                        >
+                          <img 
+                            src={qrImgUrl} 
+                            alt="QR Code Thumbnail" 
+                            style={{ width: '48px', height: '48px', borderRadius: '4px', display: 'block' }} 
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '2px',
+                            right: '2px',
+                            background: 'rgba(0,0,0,0.75)',
+                            borderRadius: '3px',
+                            padding: '1px 3px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}>
+                            <Maximize2 size={10} color="#FFFFFF" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="td-user">
+                        <span className="user-badge">{scan.user_name}</span>
+                      </td>
+                      <td className="td-time">
+                        {new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td className="td-text">{scan.raw_text}</td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="4" className="td-empty">
+                  <td colSpan="5" className="td-empty">
                     {searchQuery ? "No scans match your search query." : "No scanned data yet. Mobile scans will appear here live in real-time."}
                   </td>
                 </tr>
@@ -122,6 +166,110 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Large QR Code Preview Modal */}
+      {selectedQrImage && (
+        <div 
+          onClick={() => setSelectedQrImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1E293B',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '360px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              position: 'relative'
+            }}
+          >
+            <button 
+              onClick={() => setSelectedQrImage(null)}
+              style={{
+                position: 'absolute',
+                top: '14px',
+                right: '14px',
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                color: '#FFF',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#FFF', textAlign: 'center' }}>
+              QR Code Image Preview
+            </h3>
+            
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#10B981', fontWeight: 600 }}>
+              Scanned by {selectedQrImage.user}
+            </p>
+
+            <div style={{ background: '#FFF', padding: '16px', borderRadius: '12px' }}>
+              <img 
+                src={selectedQrImage.url} 
+                alt="Large QR Code" 
+                style={{ width: '220px', height: '220px', display: 'block' }} 
+              />
+            </div>
+
+            <p style={{ 
+              margin: 0, 
+              fontSize: '0.85rem', 
+              color: '#94A3B8', 
+              wordBreak: 'break-all', 
+              textAlign: 'center',
+              maxHeight: '80px',
+              overflowY: 'auto',
+              background: 'rgba(0,0,0,0.2)',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              width: '100%'
+            }}>
+              {selectedQrImage.text}
+            </p>
+
+            <a 
+              href={selectedQrImage.url} 
+              download="scanned_qr_code.png"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="simple-btn btn-green"
+              style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
+            >
+              <Download size={16} />
+              <span>Download Image</span>
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

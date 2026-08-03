@@ -23,15 +23,17 @@ export const WebSocketProvider = ({ children }) => {
   const [scans, setScans] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userName, setUserName] = useState(() => {
-    return safeGetStorage('qr_scanner_user_name', 'Staff');
+    return safeGetStorage('qr_scanner_user_name', '');
   });
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
 
   const updateUserName = (name) => {
-    const trimmed = name ? name.trim() : 'Staff';
-    setUserName(trimmed || 'Staff');
-    safeSetStorage('qr_scanner_user_name', trimmed || 'Staff');
+    const trimmed = name ? name.trim() : '';
+    setUserName(trimmed);
+    if (trimmed) {
+      safeSetStorage('qr_scanner_user_name', trimmed);
+    }
   };
 
   const getApiUrl = () => {

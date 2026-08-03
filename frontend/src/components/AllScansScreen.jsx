@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Trash2, Inbox } from 'lucide-react';
+import { Search, Edit3, Inbox, User } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 import ScanItemCard from './ScanItemCard';
 
-export default function AllScansScreen() {
-  const { scans, clearAllScans } = useWebSocket();
+export default function AllScansScreen({ onOpenUserModal }) {
+  const { scans, userName } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredScans = scans.filter((scan) => {
@@ -17,13 +17,51 @@ export default function AllScansScreen() {
 
   return (
     <div className="all-scans-screen">
+      {/* User Identity Bar with Edit Name Option */}
+      <div style={{
+        display: 'flex',
+        justify: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(255, 255, 255, 0.05)',
+        padding: '10px 14px',
+        borderRadius: '10px',
+        border: '1px solid rgba(255, 255, 255, 0.08)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <User size={16} color="#10B981" />
+          <span style={{ fontSize: '0.85rem', color: '#E2E8F0' }}>
+            Logged in as: <strong style={{ color: '#10B981' }}>{userName || 'Staff'}</strong>
+          </span>
+        </div>
+
+        <button 
+          onClick={onOpenUserModal}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            color: '#10B981',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          <Edit3 size={13} />
+          <span>Edit Name</span>
+        </button>
+      </div>
+
       {/* Search Input Bar */}
       <div className="search-container">
         <Search className="search-icon" size={18} />
         <input 
           type="text" 
           className="search-input"
-          placeholder="Search scans..."
+          placeholder="Search scans by text or user..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -38,7 +76,7 @@ export default function AllScansScreen() {
         </div>
       )}
 
-      {/* Feed List */}
+      {/* WhatsApp Group Feed List */}
       <div className="scan-feed-list">
         {filteredScans.length > 0 ? (
           filteredScans.map((scan, idx) => (
@@ -64,7 +102,7 @@ export default function AllScansScreen() {
               {searchQuery ? "No scans match your search query." : "No scanned data yet."}
             </p>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>
-              {searchQuery ? "Try searching for a different keyword." : "Switch to Scanner tab and tap SEND to store QR codes."}
+              {searchQuery ? "Try searching for a different keyword." : "Switch to Scanner tab to capture QR codes."}
             </p>
           </div>
         )}

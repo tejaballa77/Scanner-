@@ -76,6 +76,14 @@ function MainApp() {
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isFlashOn, setIsFlashOn] = useState(false);
+  const { userName } = useWebSocket();
+
+  // Prompt user modal on first load if nickname is empty (only in mobile scanner app)
+  React.useEffect(() => {
+    if (!userName && activeTab !== 'admin') {
+      setIsUserModalOpen(true);
+    }
+  }, [userName, activeTab]);
 
   const toggleFlash = () => {
     setIsFlashOn((prev) => !prev);
@@ -106,7 +114,7 @@ function MainApp() {
             setIsFlashOn={setIsFlashOn} 
           />
         ) : (
-          <AllScansScreen />
+          <AllScansScreen onOpenUserModal={() => setIsUserModalOpen(true)} />
         )}
       </main>
 
