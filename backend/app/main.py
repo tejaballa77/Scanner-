@@ -79,7 +79,8 @@ async def create_scan(scan_in: ScanCreate, db: AsyncSession = Depends(get_db)):
 
     new_scan = Scan(
         user_name=scan_in.user_name.strip() or "Anonymous",
-        raw_text=scan_in.raw_text  # Store exact raw text without modifying
+        raw_text=scan_in.raw_text,
+        photo_data=scan_in.photo_data
     )
     db.add(new_scan)
     await db.commit()

@@ -25,6 +25,27 @@ export default function ScannerScreen() {
     }
   };
 
+  const captureCameraSnapshot = () => {
+    try {
+      const videoElem = document.querySelector("#html5-qrcode-reader video");
+      if (!videoElem || !videoElem.videoWidth || !videoElem.videoHeight) return null;
+
+      const canvas = document.createElement("canvas");
+      const targetWidth = 480;
+      const targetHeight = Math.floor((videoElem.videoHeight / videoElem.videoWidth) * targetWidth);
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(videoElem, 0, 0, targetWidth, targetHeight);
+
+      return canvas.toDataURL("image/jpeg", 0.85);
+    } catch (e) {
+      console.error("Camera photo snapshot capture error:", e);
+      return null;
+    }
+  };
+
   const handleQrSuccess = async (decodedText) => {
     const now = Date.now();
     if (decodedText === lastScannedTextRef.current && (now - lastScannedTimeRef.current) < 1500) {
@@ -34,7 +55,10 @@ export default function ScannerScreen() {
     lastScannedTextRef.current = decodedText;
     lastScannedTimeRef.current = now;
 
-    const res = await sendScan(decodedText);
+    // Capture real live camera photo snapshot at the exact moment of scanning
+    const photoSnapshot = captureCameraSnapshot();
+
+    const res = await sendScan(decodedText, photoSnapshot);
 
     if (res && res.isDuplicate) {
       triggerVibration([250, 100, 250]);

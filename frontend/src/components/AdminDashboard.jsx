@@ -106,13 +106,15 @@ export default function AdminDashboard() {
             <tbody>
               {filteredScans.length > 0 ? (
                 filteredScans.map((scan, idx) => {
-                  const qrImgUrl = getQrImageUrl(scan.raw_text);
+                  const displayImgUrl = scan.photo_data || getQrImageUrl(scan.raw_text);
+                  const isRealSnapshot = !!scan.photo_data;
+
                   return (
                     <tr key={scan.id || idx}>
                       <td className="td-idx">{scans.length - idx}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div 
-                          onClick={() => setSelectedQrImage({ url: qrImgUrl, text: scan.raw_text, user: scan.user_name })}
+                          onClick={() => setSelectedQrImage({ url: displayImgUrl, text: scan.raw_text, user: scan.user_name, isRealSnapshot })}
                           style={{
                             display: 'inline-flex',
                             position: 'relative',
@@ -124,12 +126,12 @@ export default function AdminDashboard() {
                             transition: 'transform 0.15s ease'
                           }}
                           className="qr-thumb-wrapper"
-                          title="Click to view large QR image"
+                          title={isRealSnapshot ? "Click to view camera photo snapshot" : "Click to view QR code image"}
                         >
                           <img 
-                            src={qrImgUrl} 
-                            alt="QR Code Thumbnail" 
-                            style={{ width: '48px', height: '48px', borderRadius: '4px', display: 'block' }} 
+                            src={displayImgUrl} 
+                            alt="Camera Snapshot / QR Code" 
+                            style={{ width: '48px', height: '48px', borderRadius: '4px', display: 'block', objectFit: 'cover' }} 
                           />
                           <div style={{
                             position: 'absolute',

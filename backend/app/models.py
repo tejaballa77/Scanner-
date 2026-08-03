@@ -8,4 +8,5 @@ class Scan(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_name = Column(String(100), nullable=False, index=True)
     raw_text = Column(Text, nullable=False)
+    photo_data = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

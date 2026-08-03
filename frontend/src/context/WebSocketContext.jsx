@@ -127,13 +127,14 @@ export const WebSocketProvider = ({ children }) => {
     };
   }, [fetchScans, connectWebSocket]);
 
-  const sendScan = async (rawText) => {
+  const sendScan = async (rawText, photoData = null) => {
     if (!rawText || !rawText.trim()) return { success: false };
 
     try {
       const payload = {
         raw_text: rawText.trim(),
         user_name: userName || 'Staff',
+        photo_data: photoData || null,
       };
 
       const res = await fetch(`${getApiUrl()}/scans`, {
