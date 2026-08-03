@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Camera } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState('');
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
   const html5QrcodeRef = useRef(null);
@@ -19,6 +20,9 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
+    const element = document.getElementById("html5-qrcode-reader");
+    if (!element) return;
+
     try {
       if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode("html5-qrcode-reader", {
@@ -28,6 +32,7 @@ export default function ScannerScreen() {
       }
 
       if (html5QrcodeRef.current.isScanning) {
+        setIsCameraActive(true);
         return;
       }
 
@@ -46,7 +51,6 @@ export default function ScannerScreen() {
         config,
         async (decodedText) => {
           const now = Date.now();
-          // Debounce identical scans within 1.5 seconds to prevent duplicate spam
           if (decodedText === lastScannedTextRef.current && (now - lastScannedTimeRef.current) < 1500) {
             return;
           }
@@ -54,16 +58,13 @@ export default function ScannerScreen() {
           lastScannedTextRef.current = decodedText;
           lastScannedTimeRef.current = now;
 
-          // Instant automatic zero-click save to database with duplicate check
           const res = await sendScan(decodedText);
 
-          if (res.isDuplicate) {
-            // Warning vibration for duplicate scan
+          if (res && res.isDuplicate) {
             triggerVibration([200, 100, 200]);
             setAutoSaveNotification({ text: 'Already included', isDuplicate: true });
             setTimeout(() => setAutoSaveNotification(null), 1600);
-          } else if (res.success) {
-            // Success vibration matching PhonePe / scanner sound feel
+          } else {
             triggerVibration([120, 80, 120]);
             const previewText = decodedText.length > 25 ? decodedText.substring(0, 25) + '...' : decodedText;
             setAutoSaveNotification({ text: `Saved: "${previewText}"`, isDuplicate: false });
@@ -81,32 +82,38 @@ export default function ScannerScreen() {
         videoElem.style.height = "100%";
         videoElem.style.objectFit = "cover";
       }
+
+      setIsCameraActive(true);
     } catch (err) {
       console.error("Camera start error:", err);
-      // Retry standard start if initial call fails
       try {
         if (html5QrcodeRef.current && !html5QrcodeRef.current.isScanning) {
           await html5QrcodeRef.current.start(
             { facingMode: "user" },
             { fps: 30, qrbox: { width: 270, height: 270 } },
             async (decodedText) => {
-              triggerVibration([100, 50, 100]);
+              triggerVibration([120, 80, 120]);
               await sendScan(decodedText);
-              setAutoSaveNotification("Saved QR Code!");
-              setTimeout(() => setAutoSaveNotification(''), 1600);
+              setAutoSaveNotification({ text: "Saved QR Code!", isDuplicate: false });
+              setTimeout(() => setAutoSaveNotification(null), 1600);
             },
             () => {}
           );
+          setIsCameraActive(true);
         }
-      } catch (fallbackErr) {}
+      } catch (fallbackErr) {
+        setIsCameraActive(false);
+      }
     }
   };
 
   useEffect(() => {
-    // Automatically start camera immediately on screen mount
-    startCamera();
+    const timer = setTimeout(() => {
+      startCamera();
+    }, 300);
 
     return () => {
+      clearTimeout(timer);
       if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
         html5QrcodeRef.current.stop().catch(() => {});
       }
@@ -115,11 +122,48 @@ export default function ScannerScreen() {
 
   return (
     <div className="scanner-screen-fullscreen">
-      {/* 100% Fullscreen Camera Viewfinder */}
       <div className="viewfinder-fullscreen">
         <div id="html5-qrcode-reader"></div>
 
-        {/* Reticle Overlay Frame */}
+        {!isCameraActive && (
+          <div 
+            onClick={startCamera}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: '#0F172A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              cursor: 'pointer',
+              zIndex: 30,
+              padding: '24px',
+              textAlign: 'center'
+            }}
+          >
+            <Camera size={52} color="#10B981" />
+            <button 
+              style={{
+                padding: '14px 28px',
+                background: 'var(--primary-emerald)',
+                color: '#FFF',
+                fontWeight: 700,
+                borderRadius: '30px',
+                fontSize: '1.05rem',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              📷 Tap to Open Camera
+            </button>
+          </div>
+        )}
+
         <div className="reticle-overlay-fullscreen">
           <div className="reticle-frame-large">
             <div className="corner top-left" />
@@ -133,7 +177,6 @@ export default function ScannerScreen() {
           </div>
         </div>
 
-        {/* Auto-Save Toast Notification Overlay */}
         {autoSaveNotification && (
           <div className={`auto-save-toast ${autoSaveNotification.isDuplicate ? 'toast-duplicate' : ''}`}>
             {autoSaveNotification.isDuplicate ? (
