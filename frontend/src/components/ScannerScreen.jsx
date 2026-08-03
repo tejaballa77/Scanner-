@@ -65,11 +65,17 @@ export default function ScannerScreen() {
       }
 
       const config = {
-        fps: 30,
-        qrbox: { width: 270, height: 270 },
+        fps: 60,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          return {
+            width: Math.floor(minEdge * 0.85),
+            height: Math.floor(minEdge * 0.85)
+          };
+        },
         aspectRatio: 1.0,
         experimentalFeatures: {
-          useBarCodeDetectorIfSupported: false
+          useBarCodeDetectorIfSupported: true
         }
       };
 
