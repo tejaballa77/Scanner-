@@ -78,9 +78,10 @@ function MainApp() {
   const [isFlashOn, setIsFlashOn] = useState(false);
   const { userName } = useWebSocket();
 
-  // Prompt user modal on first load if nickname is empty (only in mobile scanner app)
+  // Prompt user modal on first load if nickname is empty or default (only in mobile scanner app)
   React.useEffect(() => {
-    if (!userName && activeTab !== 'admin') {
+    const isUnset = !userName || userName === 'Staff' || userName === 'Anonymous';
+    if (isUnset && activeTab !== 'admin') {
       setIsUserModalOpen(true);
     }
   }, [userName, activeTab]);

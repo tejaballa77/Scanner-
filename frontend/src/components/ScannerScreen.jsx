@@ -31,7 +31,7 @@ export default function ScannerScreen() {
       if (!videoElem || !videoElem.videoWidth || !videoElem.videoHeight) return null;
 
       const canvas = document.createElement("canvas");
-      const targetWidth = 480;
+      const targetWidth = Math.min(1080, videoElem.videoWidth);
       const targetHeight = Math.floor((videoElem.videoHeight / videoElem.videoWidth) * targetWidth);
       canvas.width = targetWidth;
       canvas.height = targetHeight;
@@ -39,7 +39,7 @@ export default function ScannerScreen() {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(videoElem, 0, 0, targetWidth, targetHeight);
 
-      return canvas.toDataURL("image/jpeg", 0.85);
+      return canvas.toDataURL("image/jpeg", 0.90);
     } catch (e) {
       console.error("Camera photo snapshot capture error:", e);
       return null;
@@ -55,9 +55,7 @@ export default function ScannerScreen() {
     lastScannedTextRef.current = decodedText;
     lastScannedTimeRef.current = now;
 
-    // Capture real live camera photo snapshot at the exact moment of scanning
     const photoSnapshot = captureCameraSnapshot();
-
     const res = await sendScan(decodedText, photoSnapshot);
 
     if (res && res.isDuplicate) {
@@ -88,6 +86,14 @@ export default function ScannerScreen() {
         return;
       }
 
+      // High-Definition 1080p / 4K camera constraints for 100% native clarity
+      const hdConstraints = {
+        facingMode: "environment",
+        width: { min: 1280, ideal: 1920, max: 3840 },
+        height: { min: 720, ideal: 1080, max: 2160 },
+        focusMode: { ideal: "continuous" }
+      };
+
       const config = {
         fps: 60,
         qrbox: (viewfinderWidth, viewfinderHeight) => {
@@ -105,18 +111,28 @@ export default function ScannerScreen() {
 
       try {
         await html5QrcodeRef.current.start(
-          { facingMode: "environment" },
+          hdConstraints,
           config,
           handleQrSuccess,
           () => {}
         );
       } catch (envErr) {
-        await html5QrcodeRef.current.start(
-          { facingMode: "user" },
-          config,
-          handleQrSuccess,
-          () => {}
-        );
+        console.warn("HD Rear camera failed, trying default environment camera:", envErr);
+        try {
+          await html5QrcodeRef.current.start(
+            { facingMode: "environment" },
+            config,
+            handleQrSuccess,
+            () => {}
+          );
+        } catch (fallback1) {
+          await html5QrcodeRef.current.start(
+            { facingMode: "user" },
+            config,
+            handleQrSuccess,
+            () => {}
+          );
+        }
       }
 
       const videoElem = document.querySelector("#html5-qrcode-reader video");
