@@ -52,6 +52,12 @@ async def create_scan(scan_in: ScanCreate, db: AsyncSession = Depends(get_db)):
     if not raw_text_clean:
         raise HTTPException(status_code=400, detail="Raw text cannot be empty")
 
+    # Check for duplicate scan text across database
+    existing = await db.execute(select(Scan).where(Scan.raw_text == scan_in.raw_text))
+    existing_scan = existing.scalars().first()
+    if existing_scan:
+        raise HTTPException(status_code=409, detail="Already included")
+
     new_scan = Scan(
         user_name=scan_in.user_name.strip() or "Anonymous",
         raw_text=scan_in.raw_text  # Store exact raw text without modifying

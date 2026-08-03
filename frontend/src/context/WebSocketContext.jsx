@@ -103,7 +103,7 @@ export const WebSocketProvider = ({ children }) => {
   }, [fetchScans, connectWebSocket]);
 
   const sendScan = async (rawText) => {
-    if (!rawText.trim()) return false;
+    if (!rawText.trim()) return { success: false, isDuplicate: false };
     try {
       const res = await fetch(`${getApiUrl()}/scans`, {
         method: 'POST',
@@ -114,12 +114,15 @@ export const WebSocketProvider = ({ children }) => {
         })
       });
       if (res.ok) {
-        return true;
+        return { success: true, isDuplicate: false };
       }
-      return false;
+      if (res.status === 409) {
+        return { success: false, isDuplicate: true };
+      }
+      return { success: false, isDuplicate: false };
     } catch (err) {
       console.error('Failed to send scan:', err);
-      return false;
+      return { success: false, isDuplicate: false };
     }
   };
 

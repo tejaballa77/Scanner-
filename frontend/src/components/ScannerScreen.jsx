@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
@@ -54,16 +54,21 @@ export default function ScannerScreen() {
           lastScannedTextRef.current = decodedText;
           lastScannedTimeRef.current = now;
 
-          // 1. PhonePe-style double vibration on QR detect
-          triggerVibration([100, 50, 100]);
+          // Instant automatic zero-click save to database with duplicate check
+          const res = await sendScan(decodedText);
 
-          // 2. Instant automatic zero-click save to database
-          await sendScan(decodedText);
-
-          // 3. Show brief auto-save confirmation toast
-          const previewText = decodedText.length > 25 ? decodedText.substring(0, 25) + '...' : decodedText;
-          setAutoSaveNotification(`Saved: "${previewText}"`);
-          setTimeout(() => setAutoSaveNotification(''), 1600);
+          if (res.isDuplicate) {
+            // Warning vibration for duplicate scan
+            triggerVibration([200, 100, 200]);
+            setAutoSaveNotification({ text: 'Already included', isDuplicate: true });
+            setTimeout(() => setAutoSaveNotification(null), 1600);
+          } else if (res.success) {
+            // Success vibration matching PhonePe / scanner sound feel
+            triggerVibration([120, 80, 120]);
+            const previewText = decodedText.length > 25 ? decodedText.substring(0, 25) + '...' : decodedText;
+            setAutoSaveNotification({ text: `Saved: "${previewText}"`, isDuplicate: false });
+            setTimeout(() => setAutoSaveNotification(null), 1600);
+          }
         },
         () => {}
       );
@@ -130,9 +135,13 @@ export default function ScannerScreen() {
 
         {/* Auto-Save Toast Notification Overlay */}
         {autoSaveNotification && (
-          <div className="auto-save-toast">
-            <CheckCircle2 size={20} color="#10B981" />
-            <span>{autoSaveNotification}</span>
+          <div className={`auto-save-toast ${autoSaveNotification.isDuplicate ? 'toast-duplicate' : ''}`}>
+            {autoSaveNotification.isDuplicate ? (
+              <AlertTriangle size={20} color="#F59E0B" />
+            ) : (
+              <CheckCircle2 size={20} color="#10B981" />
+            )}
+            <span>{autoSaveNotification.text}</span>
           </div>
         )}
       </div>
