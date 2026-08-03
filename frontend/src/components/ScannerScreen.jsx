@@ -5,7 +5,7 @@ import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState(null);
-  const [cameraError, setCameraError] = useState(false);
+  const [isScanningActive, setIsScanningActive] = useState(false);
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
   const html5QrcodeRef = useRef(null);
@@ -21,6 +21,7 @@ export default function ScannerScreen() {
 
   const handleQrSuccess = async (decodedText) => {
     const now = Date.now();
+    // Debounce duplicate scans within 1.5s
     if (decodedText === lastScannedTextRef.current && (now - lastScannedTimeRef.current) < 1500) {
       return;
     }
@@ -43,62 +44,35 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
-    setCameraError(false);
-    const element = document.getElementById("html5-qrcode-reader");
-    if (!element) return;
-
     try {
-      if (!html5QrcodeRef.current) {
+      if (html5QrcodeRef.current) {
+        if (html5QrcodeRef.current.isScanning) {
+          setIsScanningActive(true);
+          return;
+        }
+      } else {
         html5QrcodeRef.current = new Html5Qrcode("html5-qrcode-reader", {
           verbose: false,
           formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
         });
       }
 
-      if (html5QrcodeRef.current.isScanning) {
-        return;
-      }
-
       const config = {
         fps: 30,
-        qrbox: { width: 260, height: 260 },
-        aspectRatio: 1.0,
+        qrbox: { width: 270, height: 270 },
         formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: false
         }
       };
 
-      // Try camera constraints in order of preference
-      let cameraSelection = { facingMode: "environment" };
+      await html5QrcodeRef.current.start(
+        { facingMode: "environment" },
+        config,
+        handleQrSuccess,
+        () => {}
+      );
 
-      try {
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          const rearCam = devices.find(d => {
-            const label = d.label.toLowerCase();
-            return label.includes('back') || label.includes('rear') || label.includes('environment');
-          }) || devices[devices.length - 1]; // Use last camera (usually rear camera)
-
-          if (rearCam) {
-            cameraSelection = { deviceId: { exact: rearCam.id } };
-          }
-        }
-      } catch (camListErr) {}
-
-      try {
-        await html5QrcodeRef.current.start(cameraSelection, config, handleQrSuccess, () => {});
-      } catch (primaryErr) {
-        // Fallback 1: Generic environment facing mode
-        try {
-          await html5QrcodeRef.current.start({ facingMode: "environment" }, config, handleQrSuccess, () => {});
-        } catch (fallback1) {
-          // Fallback 2: Any available camera
-          await html5QrcodeRef.current.start({ facingMode: "user" }, config, handleQrSuccess, () => {});
-        }
-      }
-
-      // Ensure video element fits 100% viewport
       const videoElem = document.querySelector("#html5-qrcode-reader video");
       if (videoElem) {
         videoElem.setAttribute("playsinline", "true");
@@ -107,19 +81,30 @@ export default function ScannerScreen() {
         videoElem.style.height = "100%";
         videoElem.style.objectFit = "cover";
       }
-    } catch (finalErr) {
-      console.error("Camera startup error:", finalErr);
-      setCameraError(true);
+
+      setIsScanningActive(true);
+    } catch (err) {
+      console.error("Camera startup error:", err);
+      try {
+        if (html5QrcodeRef.current && !html5QrcodeRef.current.isScanning) {
+          await html5QrcodeRef.current.start(
+            { facingMode: "user" },
+            { fps: 30, qrbox: { width: 270, height: 270 } },
+            handleQrSuccess,
+            () => {}
+          );
+          setIsScanningActive(true);
+        }
+      } catch (fallbackErr) {
+        setIsScanningActive(false);
+      }
     }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      startCamera();
-    }, 200);
+    startCamera();
 
     return () => {
-      clearTimeout(timer);
       if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
         html5QrcodeRef.current.stop().catch(() => {});
       }
@@ -131,19 +116,44 @@ export default function ScannerScreen() {
       <div className="viewfinder-fullscreen">
         <div id="html5-qrcode-reader"></div>
 
-        {cameraError && (
-          <div className="camera-permission-overlay" onClick={startCamera}>
+        {!isScanningActive && (
+          <div 
+            onClick={startCamera}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: '#0F172A',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '16px',
+              cursor: 'pointer',
+              zIndex: 30,
+              padding: '24px',
+              textAlign: 'center'
+            }}
+          >
             <Camera size={52} color="#10B981" />
-            <div className="start-cam-btn">
-              📷 Tap to Allow & Turn On Camera
+            <div 
+              style={{
+                padding: '14px 28px',
+                background: 'var(--primary-emerald)',
+                color: '#FFF',
+                fontWeight: 700,
+                borderRadius: '30px',
+                fontSize: '1.05rem'
+              }}
+            >
+              📷 Tap to Turn On Camera
             </div>
-            <p style={{ fontSize: '0.82rem', color: '#94A3B8' }}>
-              Ensure camera permissions are enabled in your mobile browser settings
-            </p>
           </div>
         )}
 
-        {/* Framing Reticle Overlay */}
+        {/* Reticle Overlay Frame */}
         <div className="reticle-overlay-fullscreen">
           <div className="reticle-frame-large">
             <div className="corner top-left" />
