@@ -16,6 +16,25 @@ async def lifespan(app: FastAPI):
     # Initialize database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Clean up existing duplicate records from database
+    async with AsyncSessionLocal() as session:
+        try:
+            result = await session.execute(select(Scan).order_by(Scan.created_at))
+            all_scans = result.scalars().all()
+            seen_texts = set()
+            duplicates_to_delete = []
+            for scan in all_scans:
+                if scan.raw_text in seen_texts:
+                    duplicates_to_delete.append(scan.id)
+                else:
+                    seen_texts.add(scan.raw_text)
+            if duplicates_to_delete:
+                await session.execute(delete(Scan).where(Scan.id.in_(duplicates_to_delete)))
+                await session.commit()
+        except Exception as e:
+            pass
+
     yield
 
 app = FastAPI(

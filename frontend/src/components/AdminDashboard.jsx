@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Copy, Trash2, Search, RefreshCw, Check, ShieldCheck } from 'lucide-react';
+import { Download, Copy, Trash2, Search, RefreshCw, Check, QrCode } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function AdminDashboard() {
@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const exportToCSV = () => {
     if (scans.length === 0) return;
     
-    const headers = ['#', 'User Name', 'Timestamp', 'Raw Scanned Text'];
+    const headers = ['#', 'User Name', 'Timestamp', 'Extracted QR Data'];
     const rows = scans.map((s, idx) => [
       scans.length - idx,
       `"${s.user_name.replace(/"/g, '""')}"`,
@@ -32,7 +32,7 @@ export default function AdminDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `QR_Scans_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `QR_Scanned_Data_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -47,118 +47,86 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="admin-dashboard-container">
-      {/* Header Bar */}
-      <header className="admin-header">
-        <div className="admin-title-group">
-          <ShieldCheck size={26} color="#10B981" />
-          <div>
-            <h1>QR Scanner Admin Dashboard</h1>
-            <span className="admin-subtitle">Live Shared Feed & Data Export</span>
+    <div className="simple-admin-page">
+      <div className="simple-admin-container">
+        {/* Simple Header */}
+        <div className="simple-header">
+          <div className="simple-title">
+            <QrCode size={28} color="#10B981" />
+            <div>
+              <h2>QR Scanned Data Dashboard</h2>
+              <p>Live User Scans Overview ({scans.length} unique items)</p>
+            </div>
+          </div>
+
+          <div className="simple-actions">
+            <button className="simple-btn" onClick={fetchScans} title="Refresh">
+              <RefreshCw size={15} />
+              <span>Refresh</span>
+            </button>
+            <button className="simple-btn" onClick={copyAllText} disabled={scans.length === 0}>
+              {copied ? <Check size={15} color="#10B981" /> : <Copy size={15} />}
+              <span>{copied ? 'Copied' : 'Copy All'}</span>
+            </button>
+            <button className="simple-btn btn-green" onClick={exportToCSV} disabled={scans.length === 0}>
+              <Download size={15} />
+              <span>Export CSV</span>
+            </button>
+            {scans.length > 0 && (
+              <button className="simple-btn btn-clear" onClick={clearAllScans}>
+                <Trash2 size={15} />
+                <span>Clear All</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="admin-status-badge">
-          <span className={`status-dot ${isConnected ? 'online' : 'offline'}`} />
-          <span>{isConnected ? 'Real-Time Sync Live' : 'Connecting...'}</span>
-        </div>
-      </header>
-
-      {/* Action Controls Bar */}
-      <div className="admin-controls-bar">
-        <div className="search-box-large">
-          <Search size={18} color="#94A3B8" />
+        {/* Search Bar */}
+        <div className="simple-search">
+          <Search size={16} color="#94A3B8" />
           <input 
             type="text" 
-            placeholder="Search by scanned text or user name..."
+            placeholder="Search by user name or QR text..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <div className="admin-action-buttons">
-          <button className="btn-secondary" onClick={fetchScans} title="Refresh Scans">
-            <RefreshCw size={16} />
-            <span>Refresh</span>
-          </button>
-
-          <button className="btn-secondary" onClick={copyAllText} disabled={scans.length === 0}>
-            {copied ? <Check size={16} color="#10B981" /> : <Copy size={16} />}
-            <span>{copied ? 'Copied All' : 'Copy All Text'}</span>
-          </button>
-
-          <button className="btn-primary" onClick={exportToCSV} disabled={scans.length === 0}>
-            <Download size={16} />
-            <span>Export CSV</span>
-          </button>
-
-          {scans.length > 0 && (
-            <button className="btn-danger" onClick={clearAllScans} title="Clear All History">
-              <Trash2 size={16} />
-              <span>Clear History</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Summary Stat Cards */}
-      <div className="admin-stats-grid">
-        <div className="stat-card">
-          <span className="stat-label">Total Unique Scans</span>
-          <span className="stat-value">{scans.length}</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-label">Active Team Members</span>
-          <span className="stat-value">
-            {new Set(scans.map(s => s.user_name)).size}
-          </span>
-        </div>
-      </div>
-
-      {/* Data Table */}
-      <div className="admin-table-wrapper">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>User Name</th>
-              <th>Time</th>
-              <th>Raw Scanned Text</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredScans.length > 0 ? (
-              filteredScans.map((scan, idx) => (
-                <tr key={scan.id || idx}>
-                  <td className="col-idx">{scans.length - idx}</td>
-                  <td className="col-user">
-                    <span className="user-pill">{scan.user_name}</span>
-                  </td>
-                  <td className="col-time">
-                    {new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </td>
-                  <td className="col-text">{scan.raw_text}</td>
-                  <td className="col-action">
-                    <button 
-                      className="table-copy-btn"
-                      onClick={() => navigator.clipboard.writeText(scan.raw_text)}
-                      title="Copy text"
-                    >
-                      <Copy size={14} />
-                    </button>
+        {/* Simple Data Table */}
+        <div className="simple-table-card">
+          <table className="simple-table">
+            <thead>
+              <tr>
+                <th style={{ width: '60px' }}>#</th>
+                <th style={{ width: '180px' }}>User Name</th>
+                <th style={{ width: '140px' }}>Time</th>
+                <th>Extracted QR Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredScans.length > 0 ? (
+                filteredScans.map((scan, idx) => (
+                  <tr key={scan.id || idx}>
+                    <td className="td-idx">{scans.length - idx}</td>
+                    <td className="td-user">
+                      <span className="user-badge">{scan.user_name}</span>
+                    </td>
+                    <td className="td-time">
+                      {new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </td>
+                    <td className="td-text">{scan.raw_text}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="td-empty">
+                    {searchQuery ? "No scans match your search query." : "No scanned data yet. Mobile scans will appear here live in real-time."}
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" className="empty-table-msg">
-                  {searchQuery ? 'No scans match your search query.' : 'No scans available yet. Scanned QR codes from mobile users will appear here live!'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
