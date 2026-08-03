@@ -111,3 +111,12 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
     except Exception:
         manager.disconnect(websocket)
+
+# Serve Frontend SPA Static Files directly through FastAPI
+import os
+from fastapi.staticfiles import StaticFiles
+
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if os.path.exists(os.path.join(root_dir, "index.html")):
+    app.mount("/", StaticFiles(directory=root_dir, html=True), name="static")
+
