@@ -2,19 +2,36 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 
 const WebSocketContext = createContext(null);
 
+const safeGetStorage = (key, fallback = '') => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key) || fallback;
+    }
+  } catch (e) {}
+  return fallback;
+};
+
+const safeSetStorage = (key, val) => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, val);
+    }
+  } catch (e) {}
+};
+
 export const WebSocketProvider = ({ children }) => {
   const [scans, setScans] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('qr_scanner_user_name') || 'Staff';
+    return safeGetStorage('qr_scanner_user_name', 'Staff');
   });
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
 
   const updateUserName = (name) => {
-    const trimmed = name.trim() || 'Anonymous';
-    setUserName(trimmed);
-    localStorage.setItem('qr_scanner_user_name', trimmed);
+    const trimmed = name ? name.trim() : 'Staff';
+    setUserName(trimmed || 'Staff');
+    safeSetStorage('qr_scanner_user_name', trimmed || 'Staff');
   };
 
   const getApiUrl = () => {
@@ -43,53 +60,53 @@ export const WebSocketProvider = ({ children }) => {
       return;
     }
 
-    const wsUrl = getWsUrl();
-    console.log('Connecting to WebSocket:', wsUrl);
-    const ws = new WebSocket(wsUrl);
+    try {
+      const wsUrl = getWsUrl();
+      const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-      console.log('WebSocket Connected');
-      setIsConnected(true);
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'NEW_SCAN') {
-          setScans((prev) => {
-            if (prev.some((s) => s.id === message.data.id)) return prev;
-            return [message.data, ...prev];
-          });
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
-        } else if (message.type === 'DELETE_SCAN') {
-          setScans((prev) => prev.filter((s) => s.id !== message.data.id));
-        } else if (message.type === 'CLEAR_ALL_SCANS') {
-          setScans([]);
+      ws.onopen = () => {
+        setIsConnected(true);
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
         }
-      } catch (err) {
-        console.error('Failed to parse WS message:', err);
-      }
-    };
+      };
 
-    ws.onclose = () => {
-      console.log('WebSocket Disconnected. Retrying in 3s...');
-      setIsConnected(false);
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connectWebSocket();
-      }, 3000);
-    };
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'INITIAL_SCANS') {
+            setScans(message.data);
+          } else if (message.type === 'NEW_SCAN') {
+            setScans((prev) => {
+              const exists = prev.some((s) => s.id === message.data.id || s.raw_text === message.data.raw_text);
+              if (exists) return prev;
+              return [message.data, ...prev];
+            });
+          } else if (message.type === 'SCANS_CLEARED') {
+            setScans([]);
+          }
+        } catch (err) {
+          console.error('Error parsing WS message:', err);
+        }
+      };
 
-    ws.onerror = (err) => {
-      console.error('WebSocket Error:', err);
-      ws.close();
-    };
+      ws.onerror = () => {
+        try {
+          ws.close();
+        } catch (e) {}
+      };
 
-    wsRef.current = ws;
+      ws.onclose = () => {
+        setIsConnected(false);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, 3000);
+      };
+
+      wsRef.current = ws;
+    } catch (e) {
+      console.error("WebSocket connection error:", e);
+    }
   }, []);
 
   useEffect(() => {
@@ -97,38 +114,61 @@ export const WebSocketProvider = ({ children }) => {
     connectWebSocket();
 
     return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (wsRef.current) wsRef.current.close();
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch (e) {}
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
   }, [fetchScans, connectWebSocket]);
 
   const sendScan = async (rawText) => {
-    if (!rawText.trim()) return { success: false, isDuplicate: false };
+    if (!rawText || !rawText.trim()) return { success: false };
+
     try {
+      const payload = {
+        raw_text: rawText.trim(),
+        user_name: userName || 'Staff',
+      };
+
       const res = await fetch(`${getApiUrl()}/scans`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_name: userName || 'Anonymous',
-          raw_text: rawText
-        })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        return { success: true, isDuplicate: false };
-      }
+
       if (res.status === 409) {
         return { success: false, isDuplicate: true };
       }
-      return { success: false, isDuplicate: false };
+
+      if (res.ok) {
+        const newScan = await res.json();
+        setScans((prev) => {
+          const exists = prev.some((s) => s.id === newScan.id || s.raw_text === newScan.raw_text);
+          if (exists) return prev;
+          return [newScan, ...prev];
+        });
+        return { success: true, isDuplicate: false, data: newScan };
+      }
     } catch (err) {
       console.error('Failed to send scan:', err);
-      return { success: false, isDuplicate: false };
     }
+    return { success: false, isDuplicate: false };
   };
 
   const clearAllScans = async () => {
     try {
-      await fetch(`${getApiUrl()}/scans`, { method: 'DELETE' });
+      const res = await fetch(`${getApiUrl()}/scans`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setScans([]);
+      }
     } catch (err) {
       console.error('Failed to clear scans:', err);
     }
@@ -143,7 +183,7 @@ export const WebSocketProvider = ({ children }) => {
         updateUserName,
         sendScan,
         clearAllScans,
-        fetchScans
+        fetchScans,
       }}
     >
       {children}
@@ -151,4 +191,10 @@ export const WebSocketProvider = ({ children }) => {
   );
 };
 
-export const useWebSocket = () => useContext(WebSocketContext);
+export const useWebSocket = () => {
+  const context = useContext(WebSocketContext);
+  if (!context) {
+    throw new Error('useWebSocket must be used within a WebSocketProvider');
+  }
+  return context;
+};
