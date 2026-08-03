@@ -45,6 +45,48 @@ export const WebSocketProvider = ({ children }) => {
     return `${wsProtocol}//${window.location.host}/ws`;
   };
 
+  const getOfflineQueue = () => {
+    try {
+      const raw = safeGetStorage('qr_offline_queue', '[]');
+      return JSON.parse(raw) || [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  const setOfflineQueue = (queue) => {
+    safeSetStorage('qr_offline_queue', JSON.stringify(queue));
+  };
+
+  const syncOfflineQueue = useCallback(async () => {
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        const res = await fetch(`${getApiUrl()}/scans`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item),
+        });
+        if (res.ok) {
+          const newScan = await res.json();
+          setScans((prev) => {
+            const exists = prev.some((s) => s.id === newScan.id || s.raw_text === newScan.raw_text);
+            if (exists) return prev;
+            return [newScan, ...prev];
+          });
+        } else if (res.status !== 409) {
+          remaining.push(item);
+        }
+      } catch (err) {
+        remaining.push(item);
+      }
+    }
+    setOfflineQueue(remaining);
+  }, []);
+
   const fetchScans = useCallback(async () => {
     try {
       const res = await fetch(`${getApiUrl()}/scans`);
@@ -68,6 +110,7 @@ export const WebSocketProvider = ({ children }) => {
 
       ws.onopen = () => {
         setIsConnected(true);
+        syncOfflineQueue();
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
         }
@@ -114,13 +157,19 @@ export const WebSocketProvider = ({ children }) => {
     } catch (e) {
       console.error("WebSocket connection error:", e);
     }
-  }, []);
+  }, [syncOfflineQueue]);
 
   useEffect(() => {
     fetchScans();
     connectWebSocket();
 
+    const handleOnline = () => {
+      syncOfflineQueue();
+    };
+    window.addEventListener('online', handleOnline);
+
     return () => {
+      window.removeEventListener('online', handleOnline);
       if (wsRef.current) {
         try {
           wsRef.current.close();
@@ -130,7 +179,7 @@ export const WebSocketProvider = ({ children }) => {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [fetchScans, connectWebSocket]);
+  }, [fetchScans, connectWebSocket, syncOfflineQueue]);
 
   const sendScan = async (rawText, photoData = null) => {
     if (!rawText || !rawText.trim()) return { success: false };
@@ -141,13 +190,13 @@ export const WebSocketProvider = ({ children }) => {
       'Staff'
     ).trim();
 
-    try {
-      const payload = {
-        raw_text: rawText.trim(),
-        user_name: activeName || 'Staff',
-        photo_data: photoData || null,
-      };
+    const payload = {
+      raw_text: rawText.trim(),
+      user_name: activeName || 'Staff',
+      photo_data: photoData || null,
+    };
 
+    try {
       const res = await fetch(`${getApiUrl()}/scans`, {
         method: 'POST',
         headers: {
@@ -170,9 +219,30 @@ export const WebSocketProvider = ({ children }) => {
         return { success: true, isDuplicate: false, data: newScan };
       }
     } catch (err) {
-      console.error('Failed to send scan:', err);
+      console.error('Network offline, queuing scan locally:', err);
     }
-    return { success: false, isDuplicate: false };
+
+    // Offline handling: Queue locally and show in local feed immediately
+    const offlineItem = {
+      id: 'offline_' + Date.now(),
+      raw_text: payload.raw_text,
+      user_name: payload.user_name,
+      photo_data: payload.photo_data,
+      created_at: new Date().toISOString(),
+      isOffline: true
+    };
+
+    const currentQueue = getOfflineQueue();
+    const isDup = currentQueue.some(q => q.raw_text === payload.raw_text) || scans.some(s => s.raw_text === payload.raw_text);
+    
+    if (isDup) {
+      return { success: false, isDuplicate: true };
+    }
+
+    setOfflineQueue([...currentQueue, payload]);
+    setScans((prev) => [offlineItem, ...prev]);
+
+    return { success: true, isDuplicate: false, data: offlineItem };
   };
 
   const deleteSingleScan = async (id) => {
