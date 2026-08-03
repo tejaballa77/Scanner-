@@ -1,13 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { CheckCircle2, AlertTriangle, Camera } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState(null);
-  const [hasCameraError, setHasCameraError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
   const html5QrcodeRef = useRef(null);
@@ -52,9 +49,6 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
-    setHasCameraError(false);
-    setErrorMessage('');
-    
     const element = document.getElementById("html5-qrcode-reader");
     if (!element) return;
 
@@ -80,7 +74,6 @@ export default function ScannerScreen() {
       };
 
       try {
-        // Try rear camera first
         await html5QrcodeRef.current.start(
           { facingMode: "environment" },
           config,
@@ -88,8 +81,6 @@ export default function ScannerScreen() {
           () => {}
         );
       } catch (envErr) {
-        console.warn("Rear camera failed, trying front/user camera:", envErr);
-        // Try front camera as fallback
         await html5QrcodeRef.current.start(
           { facingMode: "user" },
           config,
@@ -98,7 +89,6 @@ export default function ScannerScreen() {
         );
       }
 
-      // Format video element to fill container 100%
       const videoElem = document.querySelector("#html5-qrcode-reader video");
       if (videoElem) {
         videoElem.setAttribute("playsinline", "true");
@@ -107,16 +97,8 @@ export default function ScannerScreen() {
         videoElem.style.height = "100%";
         videoElem.style.objectFit = "cover";
       }
-
-      setHasCameraError(false);
     } catch (err) {
       console.error("Camera start error:", err);
-      setHasCameraError(true);
-      if (err && err.name === 'NotAllowedError') {
-        setErrorMessage('Camera access was blocked. Tap Site Settings ➔ Allow Camera.');
-      } else {
-        setErrorMessage('Camera could not be accessed. Tap to try again.');
-      }
     }
   };
 
@@ -127,7 +109,7 @@ export default function ScannerScreen() {
       if (isMounted) {
         startCamera();
       }
-    }, 200);
+    }, 150);
 
     return () => {
       isMounted = false;
@@ -144,24 +126,8 @@ export default function ScannerScreen() {
 
   return (
     <div className="scanner-screen-fullscreen">
-      <div className="viewfinder-fullscreen">
+      <div className="viewfinder-fullscreen" onClick={startCamera}>
         <div id="html5-qrcode-reader"></div>
-
-        {hasCameraError && (
-          <div className="camera-permission-overlay">
-            <Camera size={52} color="#10B981" />
-            <button 
-              type="button" 
-              className="start-cam-btn"
-              onClick={startCamera}
-            >
-              📷 Tap to Start Camera
-            </button>
-            <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, maxWidth: '280px' }}>
-              {errorMessage || 'Allow camera permissions when prompted by your browser'}
-            </p>
-          </div>
-        )}
 
         {/* Reticle Overlay Frame */}
         <div className="reticle-overlay-fullscreen">
