@@ -29,26 +29,12 @@ export default function AllScansScreen() {
         />
       </div>
 
-      {/* Clear All Data Option */}
+      {/* Total Scans Count Header */}
       {scans.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>
             Total Scans: <strong>{scans.length}</strong>
           </span>
-          <button 
-            onClick={clearAllScans}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '4px', 
-              fontSize: '0.75rem', 
-              color: 'var(--text-muted)' 
-            }}
-            title="Clear all stored scans"
-          >
-            <Trash2 size={14} />
-            <span>Clear History</span>
-          </button>
         </div>
       )}
 
