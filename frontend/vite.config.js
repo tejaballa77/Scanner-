@@ -1,48 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      workbox: {
-        cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true
-      },
-      includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
-      manifest: {
-        name: 'AI Vastra Expo QR Scanner',
-        short_name: 'QR Scanner',
-        description: 'Real-time multi-user raw QR code scan sharing PWA',
-        theme_color: '#0F172A',
-        background_color: '#0F172A',
-        display: 'standalone',
-        orientation: 'portrait',
-        start_url: '/',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      }
-    })
+    react()
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/app-bundle.js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/app-bundle.[ext]'
+      }
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
