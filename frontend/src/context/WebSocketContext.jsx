@@ -6,7 +6,7 @@ export const WebSocketProvider = ({ children }) => {
   const [scans, setScans] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('qr_scanner_user_name') || '';
+    return localStorage.getItem('qr_scanner_user_name') || 'Staff';
   });
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);

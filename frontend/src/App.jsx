@@ -24,13 +24,7 @@ function MainApp() {
   const [isFlashOn, setIsFlashOn] = useState(false);
   const { userName } = useWebSocket();
 
-  // Prompt user modal on first load if nickname is empty (only in mobile scanner mode)
-  useEffect(() => {
-    if (!userName && activeTab !== 'admin') {
-      setIsUserModalOpen(true);
-    }
-  }, [userName, activeTab]);
-
+  // Initial setup
   const toggleFlash = () => {
     setIsFlashOn((prev) => !prev);
   };
