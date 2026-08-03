@@ -72,12 +72,6 @@ export default function AdminDashboard() {
               <Download size={15} />
               <span>Export CSV</span>
             </button>
-            {scans.length > 0 && (
-              <button className="simple-btn btn-clear" onClick={clearAllScans}>
-                <Trash2 size={15} />
-                <span>Clear All</span>
-              </button>
-            )}
           </div>
         </div>
 
