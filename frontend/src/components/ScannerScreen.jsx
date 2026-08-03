@@ -71,10 +71,24 @@ export default function ScannerScreen() {
     }
   };
 
+  const stopAndClearCamera = async () => {
+    if (html5QrcodeRef.current) {
+      try {
+        if (html5QrcodeRef.current.isScanning) {
+          await html5QrcodeRef.current.stop();
+        }
+        await html5QrcodeRef.current.clear();
+      } catch (e) {}
+      html5QrcodeRef.current = null;
+    }
+  };
+
   const startCamera = async () => {
     setCameraError(null);
     const element = document.getElementById("html5-qrcode-reader");
     if (!element) return;
+
+    await stopAndClearCamera();
 
     const config = {
       fps: 30,
@@ -89,20 +103,14 @@ export default function ScannerScreen() {
     };
 
     try {
-      if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode("html5-qrcode-reader", {
-          verbose: false,
-          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
-        });
-      }
+      const qrScanner = new Html5Qrcode("html5-qrcode-reader", {
+        verbose: false,
+        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+      });
+      html5QrcodeRef.current = qrScanner;
 
-      if (html5QrcodeRef.current.isScanning) {
-        return;
-      }
-
-      // Clean facingMode environment selection (forces primary back camera lens)
       try {
-        await html5QrcodeRef.current.start(
+        await qrScanner.start(
           { facingMode: "environment" },
           config,
           handleQrSuccess,
@@ -110,7 +118,7 @@ export default function ScannerScreen() {
         );
       } catch (envErr) {
         console.warn("facingMode environment failed, trying user camera:", envErr);
-        await html5QrcodeRef.current.start(
+        await qrScanner.start(
           { facingMode: "user" },
           config,
           handleQrSuccess,
@@ -144,13 +152,7 @@ export default function ScannerScreen() {
     return () => {
       isMounted = false;
       clearTimeout(timer);
-      if (html5QrcodeRef.current) {
-        try {
-          if (html5QrcodeRef.current.isScanning) {
-            html5QrcodeRef.current.stop().catch(() => {});
-          }
-        } catch (e) {}
-      }
+      stopAndClearCamera();
     };
   }, []);
 
