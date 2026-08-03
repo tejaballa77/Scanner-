@@ -100,42 +100,22 @@ export default function ScannerScreen() {
         return;
       }
 
-      // Try explicit hardware back camera selection first
+      // Clean facingMode environment selection (forces primary back camera lens)
       try {
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-          const backCamera = devices.find(d => 
-            d.label.toLowerCase().includes('back') || 
-            d.label.toLowerCase().includes('rear') ||
-            d.label.toLowerCase().includes('environment')
-          ) || devices[devices.length - 1];
-
-          await html5QrcodeRef.current.start(
-            backCamera.id,
-            config,
-            handleQrSuccess,
-            () => {}
-          );
-        } else {
-          throw new Error("No cameras enumerated");
-        }
-      } catch (devErr) {
-        // Fallback to environment facingMode
-        try {
-          await html5QrcodeRef.current.start(
-            { facingMode: "environment" },
-            config,
-            handleQrSuccess,
-            () => {}
-          );
-        } catch (envErr) {
-          await html5QrcodeRef.current.start(
-            { facingMode: "user" },
-            config,
-            handleQrSuccess,
-            () => {}
-          );
-        }
+        await html5QrcodeRef.current.start(
+          { facingMode: "environment" },
+          config,
+          handleQrSuccess,
+          () => {}
+        );
+      } catch (envErr) {
+        console.warn("facingMode environment failed, trying user camera:", envErr);
+        await html5QrcodeRef.current.start(
+          { facingMode: "user" },
+          config,
+          handleQrSuccess,
+          () => {}
+        );
       }
 
       const videoElem = document.querySelector("#html5-qrcode-reader video");
