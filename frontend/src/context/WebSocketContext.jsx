@@ -135,10 +135,16 @@ export const WebSocketProvider = ({ children }) => {
   const sendScan = async (rawText, photoData = null) => {
     if (!rawText || !rawText.trim()) return { success: false };
 
+    const activeName = (
+      userName || 
+      (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('qr_scanner_user_name') : '') || 
+      'Staff'
+    ).trim();
+
     try {
       const payload = {
         raw_text: rawText.trim(),
-        user_name: userName || 'Staff',
+        user_name: activeName || 'Staff',
         photo_data: photoData || null,
       };
 

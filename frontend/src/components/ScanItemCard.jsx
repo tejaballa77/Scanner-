@@ -6,13 +6,28 @@ export default function ScanItemCard({ scan, index }) {
   const [copied, setCopied] = useState(false);
   const { userName } = useWebSocket();
 
-  const isOwnScan = userName && scan.user_name && scan.user_name.trim().toLowerCase() === userName.trim().toLowerCase();
+  // Safely resolve current local saved user name
+  const currentSavedName = (
+    userName || 
+    (typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('qr_scanner_user_name') : '') ||
+    'Staff'
+  ).trim().toLowerCase();
 
-  const formatTime = (dateStr) => {
+  const scanUserName = (scan.user_name || '').trim().toLowerCase();
+  const isOwnScan = currentSavedName !== '' && currentSavedName !== 'staff' && scanUserName === currentSavedName;
+
+  // Format exact India Standard Time (IST - Asia/Kolkata)
+  const formatISTTime = (dateStr) => {
     if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(date);
     } catch (e) {
       return dateStr;
     }
@@ -40,7 +55,7 @@ export default function ScanItemCard({ scan, index }) {
           </span>
 
           <div className="chat-meta-right">
-            <span className="chat-timestamp">{formatTime(scan.created_at)}</span>
+            <span className="chat-timestamp">{formatISTTime(scan.created_at)} IST</span>
             <button className="chat-copy-icon" onClick={handleCopy} title="Copy Raw Text">
               {copied ? <Check size={13} color="#10B981" /> : <Copy size={13} />}
             </button>

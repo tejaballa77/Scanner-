@@ -133,6 +133,21 @@ export default function ScannerScreen() {
         videoElem.style.width = "100%";
         videoElem.style.height = "100%";
         videoElem.style.objectFit = "cover";
+        videoElem.style.filter = "contrast(1.10) brightness(1.02)";
+        videoElem.style.imageRendering = "crisp-edges";
+
+        // Safely apply hardware continuous autofocus track constraints if supported
+        try {
+          if (videoElem.srcObject) {
+            const track = videoElem.srcObject.getVideoTracks()[0];
+            if (track && track.getCapabilities) {
+              const capabilities = track.getCapabilities();
+              if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+              }
+            }
+          }
+        } catch (e) {}
       }
     } catch (err) {
       console.error("Camera start error:", err);
