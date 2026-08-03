@@ -5,8 +5,8 @@ import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isPermissionDenied, setIsPermissionDenied] = useState(false);
+  const [hasCameraError, setHasCameraError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
@@ -52,7 +52,9 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
-    setIsPermissionDenied(false);
+    setHasCameraError(false);
+    setErrorMessage('');
+    
     const element = document.getElementById("html5-qrcode-reader");
     if (!element) return;
 
@@ -65,7 +67,6 @@ export default function ScannerScreen() {
       }
 
       if (html5QrcodeRef.current.isScanning) {
-        setIsCameraActive(true);
         return;
       }
 
@@ -78,13 +79,26 @@ export default function ScannerScreen() {
         }
       };
 
-      await html5QrcodeRef.current.start(
-        { facingMode: "environment" },
-        config,
-        handleQrSuccess,
-        () => {}
-      );
+      try {
+        // Try rear camera first
+        await html5QrcodeRef.current.start(
+          { facingMode: "environment" },
+          config,
+          handleQrSuccess,
+          () => {}
+        );
+      } catch (envErr) {
+        console.warn("Rear camera failed, trying front/user camera:", envErr);
+        // Try front camera as fallback
+        await html5QrcodeRef.current.start(
+          { facingMode: "user" },
+          config,
+          handleQrSuccess,
+          () => {}
+        );
+      }
 
+      // Format video element to fill container 100%
       const videoElem = document.querySelector("#html5-qrcode-reader video");
       if (videoElem) {
         videoElem.setAttribute("playsinline", "true");
@@ -94,23 +108,14 @@ export default function ScannerScreen() {
         videoElem.style.objectFit = "cover";
       }
 
-      setIsCameraActive(true);
+      setHasCameraError(false);
     } catch (err) {
-      console.warn("Primary camera start error, trying user camera:", err);
-      try {
-        if (html5QrcodeRef.current && !html5QrcodeRef.current.isScanning) {
-          await html5QrcodeRef.current.start(
-            { facingMode: "user" },
-            { fps: 30, qrbox: { width: 270, height: 270 } },
-            handleQrSuccess,
-            () => {}
-          );
-          setIsCameraActive(true);
-        }
-      } catch (fallbackErr) {
-        console.error("Camera startup failed:", fallbackErr);
-        setIsCameraActive(false);
-        setIsPermissionDenied(true);
+      console.error("Camera start error:", err);
+      setHasCameraError(true);
+      if (err && err.name === 'NotAllowedError') {
+        setErrorMessage('Camera access was blocked. Tap Site Settings ➔ Allow Camera.');
+      } else {
+        setErrorMessage('Camera could not be accessed. Tap to try again.');
       }
     }
   };
@@ -118,13 +123,11 @@ export default function ScannerScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    const init = async () => {
+    const timer = setTimeout(() => {
       if (isMounted) {
-        await startCamera();
+        startCamera();
       }
-    };
-
-    const timer = setTimeout(init, 300);
+    }, 200);
 
     return () => {
       isMounted = false;
@@ -144,17 +147,18 @@ export default function ScannerScreen() {
       <div className="viewfinder-fullscreen">
         <div id="html5-qrcode-reader"></div>
 
-        {(!isCameraActive || isPermissionDenied) && (
-          <div 
-            onClick={startCamera}
-            className="camera-permission-overlay"
-          >
+        {hasCameraError && (
+          <div className="camera-permission-overlay">
             <Camera size={52} color="#10B981" />
-            <div className="start-cam-btn">
+            <button 
+              type="button" 
+              className="start-cam-btn"
+              onClick={startCamera}
+            >
               📷 Tap to Start Camera
-            </div>
-            <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
-              Allow camera permissions when prompted by your browser
+            </button>
+            <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0, maxWidth: '280px' }}>
+              {errorMessage || 'Allow camera permissions when prompted by your browser'}
             </p>
           </div>
         )}
