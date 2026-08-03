@@ -132,41 +132,11 @@ export default function ScannerScreen() {
         <div id="html5-qrcode-reader"></div>
 
         {cameraError && (
-          <div 
-            onClick={startCamera}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: 'rgba(15, 23, 42, 0.95)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '16px',
-              cursor: 'pointer',
-              zIndex: 30,
-              padding: '24px',
-              textAlign: 'center'
-            }}
-          >
+          <div className="camera-permission-overlay" onClick={startCamera}>
             <Camera size={52} color="#10B981" />
-            <button 
-              style={{
-                padding: '14px 28px',
-                background: 'var(--primary-emerald)',
-                color: '#FFF',
-                fontWeight: 700,
-                borderRadius: '30px',
-                fontSize: '1.05rem',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-            >
+            <div className="start-cam-btn">
               📷 Tap to Allow & Turn On Camera
-            </button>
+            </div>
             <p style={{ fontSize: '0.82rem', color: '#94A3B8' }}>
               Ensure camera permissions are enabled in your mobile browser settings
             </p>
