@@ -5,14 +5,16 @@ import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState(null);
-  const [isScanningActive, setIsScanningActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isPermissionDenied, setIsPermissionDenied] = useState(false);
+  
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
   const html5QrcodeRef = useRef(null);
   const { sendScan } = useWebSocket();
 
   const triggerVibration = (pattern) => {
-    if (navigator && navigator.vibrate) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate(pattern);
       } catch (e) {}
@@ -21,7 +23,6 @@ export default function ScannerScreen() {
 
   const handleQrSuccess = async (decodedText) => {
     const now = Date.now();
-    // Debounce duplicate scans within 1.5s
     if (decodedText === lastScannedTextRef.current && (now - lastScannedTimeRef.current) < 1500) {
       return;
     }
@@ -44,23 +45,27 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
+    setIsPermissionDenied(false);
+    const element = document.getElementById("html5-qrcode-reader");
+    if (!element) return;
+
     try {
-      if (html5QrcodeRef.current) {
-        if (html5QrcodeRef.current.isScanning) {
-          setIsScanningActive(true);
-          return;
-        }
-      } else {
+      if (!html5QrcodeRef.current) {
         html5QrcodeRef.current = new Html5Qrcode("html5-qrcode-reader", {
           verbose: false,
           formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
         });
       }
 
+      if (html5QrcodeRef.current.isScanning) {
+        setIsCameraActive(true);
+        return;
+      }
+
       const config = {
         fps: 30,
         qrbox: { width: 270, height: 270 },
-        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+        aspectRatio: 1.0,
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: false
         }
@@ -82,9 +87,9 @@ export default function ScannerScreen() {
         videoElem.style.objectFit = "cover";
       }
 
-      setIsScanningActive(true);
+      setIsCameraActive(true);
     } catch (err) {
-      console.error("Camera startup error:", err);
+      console.warn("Primary camera start error, trying user camera:", err);
       try {
         if (html5QrcodeRef.current && !html5QrcodeRef.current.isScanning) {
           await html5QrcodeRef.current.start(
@@ -93,20 +98,36 @@ export default function ScannerScreen() {
             handleQrSuccess,
             () => {}
           );
-          setIsScanningActive(true);
+          setIsCameraActive(true);
         }
       } catch (fallbackErr) {
-        setIsScanningActive(false);
+        console.error("Camera startup failed:", fallbackErr);
+        setIsCameraActive(false);
+        setIsPermissionDenied(true);
       }
     }
   };
 
   useEffect(() => {
-    startCamera();
+    let isMounted = true;
+
+    const init = async () => {
+      if (isMounted) {
+        await startCamera();
+      }
+    };
+
+    const timer = setTimeout(init, 300);
 
     return () => {
-      if (html5QrcodeRef.current && html5QrcodeRef.current.isScanning) {
-        html5QrcodeRef.current.stop().catch(() => {});
+      isMounted = false;
+      clearTimeout(timer);
+      if (html5QrcodeRef.current) {
+        try {
+          if (html5QrcodeRef.current.isScanning) {
+            html5QrcodeRef.current.stop().catch(() => {});
+          }
+        } catch (e) {}
       }
     };
   }, []);
@@ -116,40 +137,18 @@ export default function ScannerScreen() {
       <div className="viewfinder-fullscreen">
         <div id="html5-qrcode-reader"></div>
 
-        {!isScanningActive && (
+        {(!isCameraActive || isPermissionDenied) && (
           <div 
             onClick={startCamera}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: '#0F172A',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '16px',
-              cursor: 'pointer',
-              zIndex: 30,
-              padding: '24px',
-              textAlign: 'center'
-            }}
+            className="camera-permission-overlay"
           >
             <Camera size={52} color="#10B981" />
-            <div 
-              style={{
-                padding: '14px 28px',
-                background: 'var(--primary-emerald)',
-                color: '#FFF',
-                fontWeight: 700,
-                borderRadius: '30px',
-                fontSize: '1.05rem'
-              }}
-            >
-              📷 Tap to Turn On Camera
+            <div className="start-cam-btn">
+              📷 Tap to Start Camera
             </div>
+            <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
+              Allow camera permissions when prompted by your browser
+            </p>
           </div>
         )}
 
@@ -167,7 +166,7 @@ export default function ScannerScreen() {
           </div>
         </div>
 
-        {/* Auto-Save Toast Notification Overlay */}
+        {/* Toast Notification Overlay */}
         {autoSaveNotification && (
           <div className={`auto-save-toast ${autoSaveNotification.isDuplicate ? 'toast-duplicate' : ''}`}>
             {autoSaveNotification.isDuplicate ? (
