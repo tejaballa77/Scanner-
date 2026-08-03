@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Download, Copy, Search, RefreshCw, Check, QrCode, X, Maximize2 } from 'lucide-react';
+import { Download, Copy, Search, RefreshCw, Check, QrCode, X, Maximize2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function AdminDashboard() {
-  const { scans, fetchScans } = useWebSocket();
+  const { scans, clearAllScans, deleteSingleScan, deleteBulkScans, fetchScans } = useWebSocket();
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
   const [selectedQrImage, setSelectedQrImage] = useState(null);
+  const [selectedScanIds, setSelectedScanIds] = useState([]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const filteredScans = scans.filter((scan) => {
     const q = searchQuery.toLowerCase();
@@ -15,6 +17,44 @@ export default function AdminDashboard() {
       scan.user_name.toLowerCase().includes(q)
     );
   });
+
+  const isAllSelected = filteredScans.length > 0 && filteredScans.every(s => selectedScanIds.includes(s.id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedScanIds([]);
+    } else {
+      setSelectedScanIds(filteredScans.map(s => s.id));
+    }
+  };
+
+  const toggleSelectScan = (id) => {
+    setSelectedScanIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedScanIds.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${selectedScanIds.length} selected scan(s)?`)) {
+      await deleteBulkScans(selectedScanIds);
+      setSelectedScanIds([]);
+    }
+  };
+
+  const handleDeleteSingle = async (id, e) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this scan record?")) {
+      await deleteSingleScan(id);
+      setSelectedScanIds(prev => prev.filter(itemId => itemId !== id));
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setShowClearConfirm(false);
+    await clearAllScans();
+    setSelectedScanIds([]);
+  };
 
   const exportToCSV = () => {
     if (scans.length === 0) return;
@@ -77,6 +117,22 @@ export default function AdminDashboard() {
               <Download size={15} />
               <span>Export CSV</span>
             </button>
+
+            {/* Bulk Delete Selected Button */}
+            {selectedScanIds.length > 0 && (
+              <button className="simple-btn btn-clear" onClick={handleDeleteSelected}>
+                <Trash2 size={15} />
+                <span>Delete Selected ({selectedScanIds.length})</span>
+              </button>
+            )}
+
+            {/* Clear All History Button */}
+            {scans.length > 0 && (
+              <button className="simple-btn btn-clear" onClick={() => setShowClearConfirm(true)}>
+                <Trash2 size={15} />
+                <span>Clear History</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -96,11 +152,21 @@ export default function AdminDashboard() {
           <table className="simple-table">
             <thead>
               <tr>
+                <th style={{ width: '40px', textAlign: 'center' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected}
+                    onChange={toggleSelectAll}
+                    disabled={filteredScans.length === 0}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                </th>
                 <th style={{ width: '50px' }}>#</th>
                 <th style={{ width: '100px', textAlign: 'center' }}>QR CODE IMAGE</th>
                 <th style={{ width: '150px' }}>USER NAME</th>
                 <th style={{ width: '130px' }}>TIME</th>
                 <th>EXTRACTED QR DATA</th>
+                <th style={{ width: '70px', textAlign: 'center' }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -108,9 +174,18 @@ export default function AdminDashboard() {
                 filteredScans.map((scan, idx) => {
                   const displayImgUrl = scan.photo_data || getQrImageUrl(scan.raw_text);
                   const isRealSnapshot = !!scan.photo_data;
+                  const isSelected = selectedScanIds.includes(scan.id);
 
                   return (
-                    <tr key={scan.id || idx}>
+                    <tr key={scan.id || idx} style={{ backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : 'transparent' }}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => toggleSelectScan(scan.id)}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                      </td>
                       <td className="td-idx">{scans.length - idx}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div 
@@ -154,12 +229,31 @@ export default function AdminDashboard() {
                         {new Date(scan.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </td>
                       <td className="td-text">{scan.raw_text}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button 
+                          onClick={(e) => handleDeleteSingle(scan.id, e)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#EF4444',
+                            borderRadius: '6px',
+                            padding: '6px 8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="Delete scan record"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="td-empty">
+                  <td colSpan="7" className="td-empty">
                     {searchQuery ? "No scans match your search query." : "No scanned data yet. Mobile scans will appear here live in real-time."}
                   </td>
                 </tr>
@@ -168,6 +262,99 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Clear All History Confirmation Modal */}
+      {showClearConfirm && (
+        <div 
+          onClick={() => setShowClearConfirm(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1E293B',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '380px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#EF4444'
+            }}>
+              <Trash2 size={24} />
+            </div>
+
+            <h3 style={{ margin: 0, color: '#FFF', fontSize: '1.2rem' }}>
+              Clear All Scan History?
+            </h3>
+
+            <p style={{ margin: 0, color: '#94A3B8', fontSize: '0.88rem', lineHeight: '1.5' }}>
+              Are you sure you want to permanently clear all <strong>{scans.length}</strong> scan records from the database? This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
+              <button 
+                onClick={() => setShowClearConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#F1F5F9',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleClearHistory}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#EF4444',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Yes, Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Large QR Code Preview Modal */}
       {selectedQrImage && (
@@ -227,18 +414,18 @@ export default function AdminDashboard() {
             </button>
 
             <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#FFF', textAlign: 'center' }}>
-              QR Code Image Preview
+              {selectedQrImage.isRealSnapshot ? 'Camera Photo Snapshot' : 'QR Code Image Preview'}
             </h3>
             
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#10B981', fontWeight: 600 }}>
               Scanned by {selectedQrImage.user}
             </p>
 
-            <div style={{ background: '#FFF', padding: '16px', borderRadius: '12px' }}>
+            <div style={{ background: '#FFF', padding: '12px', borderRadius: '12px' }}>
               <img 
                 src={selectedQrImage.url} 
-                alt="Large QR Code" 
-                style={{ width: '220px', height: '220px', display: 'block' }} 
+                alt="Large Preview" 
+                style={{ width: '240px', height: '240px', display: 'block', objectFit: 'cover', borderRadius: '8px' }} 
               />
             </div>
 

@@ -84,7 +84,12 @@ export const WebSocketProvider = ({ children }) => {
               if (exists) return prev;
               return [message.data, ...prev];
             });
-          } else if (message.type === 'SCANS_CLEARED') {
+          } else if (message.type === 'DELETE_SCAN') {
+            setScans((prev) => prev.filter((s) => s.id !== message.data.id));
+          } else if (message.type === 'BULK_DELETE_SCANS') {
+            const deleteIds = new Set(message.data.ids);
+            setScans((prev) => prev.filter((s) => !deleteIds.has(s.id)));
+          } else if (message.type === 'SCANS_CLEARED' || message.type === 'CLEAR_ALL_SCANS') {
             setScans([]);
           }
         } catch (err) {
@@ -164,6 +169,34 @@ export const WebSocketProvider = ({ children }) => {
     return { success: false, isDuplicate: false };
   };
 
+  const deleteSingleScan = async (id) => {
+    try {
+      const res = await fetch(`${getApiUrl()}/scans/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setScans((prev) => prev.filter((s) => s.id !== id));
+      }
+    } catch (err) {
+      console.error('Failed to delete scan:', err);
+    }
+  };
+
+  const deleteBulkScans = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    try {
+      const res = await fetch(`${getApiUrl()}/scans/bulk-delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) {
+        const idSet = new Set(ids);
+        setScans((prev) => prev.filter((s) => !idSet.has(s.id)));
+      }
+    } catch (err) {
+      console.error('Failed to bulk delete scans:', err);
+    }
+  };
+
   const clearAllScans = async () => {
     try {
       const res = await fetch(`${getApiUrl()}/scans`, {
@@ -185,6 +218,8 @@ export const WebSocketProvider = ({ children }) => {
         userName,
         updateUserName,
         sendScan,
+        deleteSingleScan,
+        deleteBulkScans,
         clearAllScans,
         fetchScans,
       }}

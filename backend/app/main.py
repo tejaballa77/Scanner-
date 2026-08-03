@@ -114,6 +114,26 @@ async def delete_scan(scan_id: int, db: AsyncSession = Depends(get_db)):
 
     return {"status": "success", "message": f"Scan {scan_id} deleted"}
 
+from pydantic import BaseModel
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+@app.post("/api/scans/bulk-delete")
+async def bulk_delete_scans(req: BulkDeleteRequest, db: AsyncSession = Depends(get_db)):
+    if not req.ids:
+        return {"status": "success", "deleted_count": 0}
+
+    await db.execute(delete(Scan).where(Scan.id.in_(req.ids)))
+    await db.commit()
+
+    await manager.broadcast({
+        "type": "BULK_DELETE_SCANS",
+        "data": {"ids": req.ids}
+    })
+
+    return {"status": "success", "deleted_count": len(req.ids)}
+
 @app.delete("/api/scans")
 async def clear_all_scans(db: AsyncSession = Depends(get_db)):
     await db.execute(delete(Scan))
