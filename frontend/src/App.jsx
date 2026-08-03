@@ -10,14 +10,13 @@ import './App.css';
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState(() => {
-    // Default to 'admin' dashboard if opened on desktop or if URL contains admin
-    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
-    const isUrlAdmin = typeof window !== 'undefined' && (
+    // Explicit admin URL check: ?admin=true or #admin or /admin
+    const isExplicitAdmin = typeof window !== 'undefined' && (
       window.location.search.includes('admin') || 
       window.location.hash.includes('admin') ||
       window.location.pathname.includes('admin')
     );
-    return (isDesktop || isUrlAdmin) ? 'admin' : 'scanner';
+    return isExplicitAdmin ? 'admin' : 'scanner';
   });
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
