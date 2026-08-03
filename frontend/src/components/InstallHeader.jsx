@@ -4,12 +4,23 @@ import { Download, Smartphone, X } from 'lucide-react';
 export default function InstallHeader() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // Check if running in standalone (installed PWA) mode
+    const checkStandalone = () => {
+      const isStandaloneMode = 
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true ||
+        document.referrer.includes('android-app://');
+
+      setIsStandalone(isStandaloneMode);
+    };
+
+    checkStandalone();
+
     const handleBeforeInstallPrompt = (e) => {
-      // Prevent browser default mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
@@ -26,14 +37,15 @@ export default function InstallHeader() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
+        setIsDismissed(true);
       }
     } else {
-      // Fallback instruction for browsers/iOS
       alert("To install this app on your phone home screen:\n\n• Android Chrome: Tap 3 dots (⋮) top right ➔ 'Install app' or 'Add to Home Screen'\n• iPhone Safari: Tap Share icon (⎋) bottom center ➔ 'Add to Home Screen'");
     }
   };
 
-  if (isDismissed) return null;
+  // Hide header completely if running inside installed app or dismissed
+  if (isStandalone || isDismissed) return null;
 
   return (
     <div className="install-header-banner">
