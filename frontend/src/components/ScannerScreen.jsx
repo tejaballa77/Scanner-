@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Camera } from 'lucide-react';
 import { useWebSocket } from '../context/WebSocketContext';
 
 export default function ScannerScreen() {
   const [autoSaveNotification, setAutoSaveNotification] = useState(null);
+  const [cameraError, setCameraError] = useState(null);
   const lastScannedTimeRef = useRef(0);
   const lastScannedTextRef = useRef('');
   const html5QrcodeRef = useRef(null);
@@ -71,8 +72,21 @@ export default function ScannerScreen() {
   };
 
   const startCamera = async () => {
+    setCameraError(null);
     const element = document.getElementById("html5-qrcode-reader");
     if (!element) return;
+
+    const config = {
+      fps: 30,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        return {
+          width: Math.floor(minEdge * 0.85),
+          height: Math.floor(minEdge * 0.85)
+        };
+      },
+      aspectRatio: 1.0
+    };
 
     try {
       if (!html5QrcodeRef.current) {
@@ -86,24 +100,41 @@ export default function ScannerScreen() {
         return;
       }
 
+      // Try explicit hardware back camera selection first
       try {
-        await html5QrcodeRef.current.start(
-          { facingMode: "environment" },
-          config,
-          handleQrSuccess,
-          () => {}
-        );
-      } catch (envErr) {
-        console.warn("Rear environment camera failed, trying front user camera:", envErr);
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          const backCamera = devices.find(d => 
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('rear') ||
+            d.label.toLowerCase().includes('environment')
+          ) || devices[devices.length - 1];
+
+          await html5QrcodeRef.current.start(
+            backCamera.id,
+            config,
+            handleQrSuccess,
+            () => {}
+          );
+        } else {
+          throw new Error("No cameras enumerated");
+        }
+      } catch (devErr) {
+        // Fallback to environment facingMode
         try {
+          await html5QrcodeRef.current.start(
+            { facingMode: "environment" },
+            config,
+            handleQrSuccess,
+            () => {}
+          );
+        } catch (envErr) {
           await html5QrcodeRef.current.start(
             { facingMode: "user" },
             config,
             handleQrSuccess,
             () => {}
           );
-        } catch (fallback1) {
-          console.error("All camera start attempts failed:", fallback1);
         }
       }
 
@@ -117,6 +148,7 @@ export default function ScannerScreen() {
       }
     } catch (err) {
       console.error("Camera start error:", err);
+      setCameraError("Camera permission blocked or unavailable. Tap to retry.");
     }
   };
 
@@ -160,6 +192,47 @@ export default function ScannerScreen() {
             Place the code inside the frame
           </div>
         </div>
+
+        {/* Camera Failure Fallback Overlay */}
+        {cameraError && (
+          <div 
+            onClick={startCamera}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(15, 23, 42, 0.92)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 50,
+              padding: '24px',
+              gap: '16px',
+              textAlign: 'center',
+              cursor: 'pointer'
+            }}
+          >
+            <Camera size={48} color="#10B981" />
+            <p style={{ color: '#F8FAFC', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
+              {cameraError}
+            </p>
+            <button style={{
+              background: '#10B981',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '25px',
+              padding: '12px 28px',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}>
+              📷 Tap to Start Camera
+            </button>
+          </div>
+        )}
 
         {/* Toast Notification Overlay */}
         {autoSaveNotification && (
