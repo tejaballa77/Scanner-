@@ -226,13 +226,20 @@ export default function AdminDashboard() {
                         <span className="user-badge">{scan.user_name}</span>
                       </td>
                       <td className="td-time">
-                        {new Intl.DateTimeFormat('en-IN', {
-                          timeZone: 'Asia/Kolkata',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: true
-                        }).format(new Date(scan.created_at))} IST
+                        {(() => {
+                          if (!scan.created_at) return '';
+                          let str = String(scan.created_at).trim();
+                          if (!str.endsWith('Z') && !str.includes('+')) {
+                            str += 'Z';
+                          }
+                          return new Intl.DateTimeFormat('en-IN', {
+                            timeZone: 'Asia/Kolkata',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true
+                          }).format(new Date(str));
+                        })()} IST
                       </td>
                       <td className="td-text">{scan.raw_text}</td>
                       <td style={{ textAlign: 'center' }}>

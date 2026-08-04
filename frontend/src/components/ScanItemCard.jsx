@@ -20,7 +20,11 @@ export default function ScanItemCard({ scan, index }) {
   const formatISTTime = (dateStr) => {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
+      let str = String(dateStr).trim();
+      if (!str.endsWith('Z') && !str.includes('+')) {
+        str += 'Z';
+      }
+      const date = new Date(str);
       return new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
         hour: '2-digit',

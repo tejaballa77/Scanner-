@@ -57,15 +57,27 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok", "message": "QR Scanner API is running"}
 
-@app.get("/api/scans", response_model=List[ScanResponse])
+@app.get("/api/scans")
 async def get_scans(limit: int = 500, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Scan).order_by(desc(Scan.created_at)).limit(limit)
     )
     scans = result.scalars().all()
-    return scans
+    scan_list = []
+    for s in scans:
+        dt_str = s.created_at.isoformat() if s.created_at else ""
+        if dt_str and not dt_str.endswith("Z") and "+" not in dt_str:
+            dt_str += "Z"
+        scan_list.append({
+            "id": s.id,
+            "user_name": s.user_name,
+            "raw_text": s.raw_text,
+            "photo_data": s.photo_data,
+            "created_at": dt_str
+        })
+    return scan_list
 
-@app.post("/api/scans", response_model=ScanResponse, status_code=201)
+@app.post("/api/scans", status_code=201)
 async def create_scan(scan_in: ScanCreate, db: AsyncSession = Depends(get_db)):
     raw_text_clean = scan_in.raw_text.strip()
     if not raw_text_clean:
@@ -86,8 +98,17 @@ async def create_scan(scan_in: ScanCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(new_scan)
 
-    scan_data = ScanResponse.model_validate(new_scan).model_dump(mode="json")
-    scan_data["created_at"] = new_scan.created_at.isoformat()
+    dt_str = new_scan.created_at.isoformat() if new_scan.created_at else ""
+    if dt_str and not dt_str.endswith("Z") and "+" not in dt_str:
+        dt_str += "Z"
+
+    scan_data = {
+        "id": new_scan.id,
+        "user_name": new_scan.user_name,
+        "raw_text": new_scan.raw_text,
+        "photo_data": new_scan.photo_data,
+        "created_at": dt_str
+    }
 
     # Broadcast new scan to all connected WebSocket clients instantly
     await manager.broadcast({
@@ -95,7 +116,7 @@ async def create_scan(scan_in: ScanCreate, db: AsyncSession = Depends(get_db)):
         "data": scan_data
     })
 
-    return new_scan
+    return scan_data
 
 @app.delete("/api/scans/{scan_id}")
 async def delete_scan(scan_id: int, db: AsyncSession = Depends(get_db)):
