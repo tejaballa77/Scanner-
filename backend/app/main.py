@@ -13,9 +13,14 @@ from app.websocket import manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables
+    # Initialize database tables & auto-migrate missing columns
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE scans ADD COLUMN photo_data TEXT"))
+        except Exception:
+            pass
 
     # Clean up existing duplicate records from database
     async with AsyncSessionLocal() as session:

@@ -8,24 +8,33 @@ export default function UserModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const handleClose = () => {
+    if (!userName) {
+      updateUserName('Staff');
+    }
+    onClose();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (nameInput.trim()) {
-      updateUserName(nameInput.trim());
-      onClose();
-    }
+    const finalName = nameInput.trim() || 'Staff';
+    updateUserName(finalName);
+    onClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="modal-title">Scanner User Identity</h2>
-          {userName && (
-            <button className="icon-btn" onClick={onClose}>
-              <X size={20} />
-            </button>
-          )}
+          <button 
+            type="button"
+            className="icon-btn" 
+            onClick={handleClose}
+            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <p className="modal-sub">
@@ -45,7 +54,6 @@ export default function UserModal({ isOpen, onClose }) {
           <button 
             type="submit" 
             className="modal-save-btn"
-            disabled={!nameInput.trim()}
           >
             Save & Continue
           </button>

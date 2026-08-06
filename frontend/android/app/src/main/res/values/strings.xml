@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">AI Vastra Expo Scanner</string>
-    <string name="title_activity_main">AI Vastra Expo Scanner</string>
-    <string name="package_name">com.aivastra.qrscanner</string>
-    <string name="custom_url_scheme">com.aivastra.qrscanner</string>
-</resources>
